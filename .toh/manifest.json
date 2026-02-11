@@ -1,0 +1,16 @@
+{
+  "version": "1.8.1",
+  "installedAt": "2026-02-10T23:11:11.969Z",
+  "targetDir": "/home/deachawat/dev/projects/Gale-Oracle/projects/RM-Remove",
+  "ides": [
+    "claude",
+    "gemini"
+  ],
+  "components": {
+    "skills": true,
+    "agents": true,
+    "commands": true,
+    "templates": true,
+    "memory": true
+  }
+}
