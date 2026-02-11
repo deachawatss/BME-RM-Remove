@@ -21,6 +21,9 @@ jsonwebtoken = "9"
 bcrypt = "0.15"
 thiserror = "1.0"
 anyhow = "1.0"
+ldap3 = "0.11"
+native-tls = "0.2"
+url = "2.5"
 
 [dependencies.uuid]
 version = "1.6"

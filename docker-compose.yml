@@ -18,7 +18,33 @@ services:
     environment:
       - RUST_LOG=info
       - SERVER_PORT=6066
-      # LDAP timeout default
+      # LDAP Authentication Configuration
+      # ------------------------------------------------------------------------
+      # LDAP_URL: LDAP server URL (use ldaps:// for production)
+      #   - Format: ldaps://hostname:port or ldap://hostname:port
+      #   - Default: ldaps://ldap.nwfth.com:636
+      # - LDAP_URL=ldaps://ldap.nwfth.com:636
+      #
+      # LDAP_DOMAIN: Domain for User Principal Name (UPN) format
+      #   - Used to build UPN: username@domain
+      #   - Default: NWFTH.com
+      # - LDAP_DOMAIN=NWFTH.com
+      #
+      # LDAP_BASE_DN: Base Distinguished Name for searches
+      #   - Default: DC=NWFTH,DC=com
+      # - LDAP_BASE_DN=DC=NWFTH,DC=com
+      #
+      # LDAP_TIMEOUT_SECS: Connection and operation timeout in seconds
+      # - LDAP_TIMEOUT_SECS=5
+      #
+      # LDAP_VERIFY_CERTS: Verify TLS certificates (disable only for testing)
+      #   - Set to "false" to skip cert validation (insecure, development only)
+      # - LDAP_VERIFY_CERTS=true
+      #
+      # LDAP_USER_FILTER: LDAP filter template for user search
+      #   - {} is replaced with the username
+      #   - Default: (sAMAccountName={})
+      # - LDAP_USER_FILTER=(sAMAccountName={})
       - LDAP_TIMEOUT_SECS=5
     env_file:
       - ./backend/.env

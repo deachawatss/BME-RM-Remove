@@ -5,6 +5,7 @@ use log::info;
 use std::env;
 
 mod db;
+mod ldap;
 mod models;
 mod routes;
 

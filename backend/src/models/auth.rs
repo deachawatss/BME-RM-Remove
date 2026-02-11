@@ -23,6 +23,9 @@ pub struct UserInfo {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: String,
+    /// Display name of the user (for UI display)
+    #[serde(default)]
+    pub display_name: String,
     pub exp: usize,
     pub iat: usize,
 }

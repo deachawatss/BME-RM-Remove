@@ -5,6 +5,7 @@ use std::env;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::db::mssql::{get_string, MssqlPool};
+use crate::ldap::{self, LdapError, LdapUser};
 use crate::models::auth::{Claims, LoginRequest, LoginResponse, UserInfo};
 
 pub fn config(cfg: &mut web::ServiceConfig) {
@@ -28,16 +29,18 @@ async fn login(pool: web::Data<MssqlPool>, request: web::Json<LoginRequest>) -> 
 
     // Try LDAP authentication first
     match authenticate_ldap(&username, &password).await {
-        Ok(true) => {
-            info!("LDAP authentication successful for user: {}", username);
-            let display_name = username.clone();
-            match generate_token(&username) {
+        Ok(ldap_user) => {
+            info!(
+                "LDAP authentication successful for user: {} (display_name: {})",
+                username, ldap_user.display_name
+            );
+            match generate_token_with_display_name(&ldap_user.username, &ldap_user.display_name) {
                 Ok(token) => HttpResponse::Ok().json(LoginResponse {
                     success: true,
                     token: Some(token),
                     user: Some(UserInfo {
-                        username: username.clone(),
-                        display_name,
+                        username: ldap_user.username.clone(),
+                        display_name: ldap_user.display_name.clone(),
                     }),
                     message: "Login successful".to_string(),
                 }),
@@ -52,7 +55,8 @@ async fn login(pool: web::Data<MssqlPool>, request: web::Json<LoginRequest>) -> 
                 }
             }
         }
-        Ok(false) => {
+        Err(LdapError::AuthError(_)) => {
+            // LDAP authentication explicitly failed (invalid credentials)
             warn!("LDAP authentication failed for user: {}", username);
             HttpResponse::Unauthorized().json(LoginResponse {
                 success: false,
@@ -61,9 +65,20 @@ async fn login(pool: web::Data<MssqlPool>, request: web::Json<LoginRequest>) -> 
                 message: "Invalid username or password".to_string(),
             })
         }
+        Err(LdapError::UserNotFound) => {
+            // User not found in LDAP - this is still an auth failure
+            warn!("LDAP user not found: {}", username);
+            HttpResponse::Unauthorized().json(LoginResponse {
+                success: false,
+                token: None,
+                user: None,
+                message: "Invalid username or password".to_string(),
+            })
+        }
         Err(e) => {
+            // LDAP error (connection, configuration, timeout, etc.)
+            // Fall back to SQL authentication for non-LDAP users
             error!("LDAP error for user {}: {}", username, e);
-            // Fall back to SQL authentication
             handle_sql_fallback(pool, username, password).await
         }
     }
@@ -288,38 +303,23 @@ async fn handle_sql_fallback(
     }
 }
 
-async fn authenticate_ldap(
-    username: &str,
-    _password: &str,
-) -> Result<bool, Box<dyn std::error::Error>> {
-    let ldap_url =
-        env::var("LDAP_URL").unwrap_or_else(|_| "ldaps://ldap.nwfth.com:636".to_string());
-    let _base_dn = env::var("LDAP_BASE_DN").unwrap_or_else(|_| "DC=NWFTH,DC=com".to_string());
-    let domain = env::var("LDAP_DOMAIN").unwrap_or_else(|_| "NWFTH.com".to_string());
-    let _timeout_secs = env::var("LDAP_TIMEOUT_SECS")
-        .unwrap_or_else(|_| "5".to_string())
-        .parse::<u64>()?;
-
-    // Build user principal name
-    let user_principal = if username.contains('@') {
-        username.to_string()
-    } else {
-        format!("{}@{}", username, domain)
-    };
-
-    // For now, return false to trigger SQL fallback
-    // In production, this would connect to LDAP and authenticate
-    info!(
-        "LDAP authentication not fully implemented, would authenticate: {} at {}",
-        user_principal, ldap_url
-    );
-
-    // Placeholder: In production, implement actual LDAP bind
-    // This is a simplified version - real implementation would use ldap3 crate
-    Ok(false)
+/// Authenticate a user against LDAP/Active Directory
+///
+/// Returns the LdapUser on success, or an LdapError on failure.
+/// Note: AuthError and UserNotFound are explicit authentication failures,
+/// while other errors may indicate configuration or connection issues.
+async fn authenticate_ldap(username: &str, password: &str) -> Result<LdapUser, LdapError> {
+    ldap::authenticate(username, password).await
 }
 
 fn generate_token(username: &str) -> Result<String, jsonwebtoken::errors::Error> {
+    generate_token_with_display_name(username, username)
+}
+
+fn generate_token_with_display_name(
+    username: &str,
+    display_name: &str,
+) -> Result<String, jsonwebtoken::errors::Error> {
     let secret = env::var(JWT_SECRET_ENV).unwrap_or_else(|_| DEFAULT_JWT_SECRET.to_string());
 
     let now = SystemTime::now()
@@ -331,6 +331,7 @@ fn generate_token(username: &str) -> Result<String, jsonwebtoken::errors::Error>
 
     let claims = Claims {
         sub: username.to_string(),
+        display_name: display_name.to_string(),
         exp,
         iat: now,
     };
