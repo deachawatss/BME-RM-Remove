@@ -11,6 +11,7 @@ pub type DbClient = Client<Compat<TcpStream>>;
 pub struct MssqlPool {
     config: Config,
     host: String,
+    port: u16,
 }
 
 impl MssqlPool {
@@ -19,23 +20,29 @@ impl MssqlPool {
         let database = env::var("DB_DATABASE").context("DB_DATABASE not set")?;
         let username = env::var("DB_USERNAME").context("DB_USERNAME not set")?;
         let password = env::var("DB_PASSWORD").context("DB_PASSWORD not set")?;
+        let port = env::var("DB_PORT")
+            .ok()
+            .and_then(|p| p.parse::<u16>().ok())
+            .unwrap_or(1433);
 
         let mut config = Config::new();
         config.host(&server);
+        config.port(port);
         config.database(database);
         config.authentication(AuthMethod::sql_server(username, password));
         config.trust_cert();
 
-        info!("MSSQL configuration initialized for server: {}", server);
+        info!("MSSQL configuration initialized for server: {}:{}", server, port);
 
         Ok(MssqlPool {
             config,
             host: server,
+            port,
         })
     }
 
     pub async fn get_client(&self) -> Result<DbClient> {
-        let tcp = TcpStream::connect(format!("{}:1433", self.host))
+        let tcp = TcpStream::connect(format!("{}:{}", self.host, self.port))
             .await
             .context("Failed to connect to MSSQL server")?;
 
