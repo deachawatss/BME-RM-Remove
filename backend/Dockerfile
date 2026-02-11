@@ -7,7 +7,7 @@
 # -----------------------------------------------------------------------------
 # Stage 1: Builder
 # -----------------------------------------------------------------------------
-FROM rust:1.82-slim AS builder
+FROM rust:1.84-slim AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -72,7 +72,7 @@ ENV SERVER_PORT=6066
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:6066/api/health || exit 1
+    CMD curl -f http://127.0.0.1:6066/api/health || exit 1
 
 # Run the binary
 CMD ["./app"]

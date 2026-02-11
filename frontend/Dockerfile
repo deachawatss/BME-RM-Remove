@@ -16,16 +16,16 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Copy package files first for better layer caching
-COPY my-app/package*.json ./
+COPY package*.json ./
 
 # Install dependencies
 RUN npm ci
 
 # Copy application source
-COPY my-app/ ./
+COPY . ./
 
 # Set build-time environment variables
-ARG NEXT_PUBLIC_API_URL=http://localhost:6066
+ARG NEXT_PUBLIC_API_URL=http://127.0.0.1:6066
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
 # Build Next.js app (standalone output)
@@ -64,7 +64,7 @@ ENV HOSTNAME=0.0.0.0
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:6065/ || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:6065/ || exit 1
 
 # Start the application with dumb-init
 ENTRYPOINT ["dumb-init", "--"]

@@ -2,11 +2,10 @@ use actix_web::{get, post, web, HttpResponse, Responder};
 use log::{error, info};
 
 use crate::db::mssql::{get_f64, get_i32, get_optional_f64, get_string, MssqlPool};
-use crate::models::rm::{RemoveRequest, RemoveResponse, RMLine, SearchResponse};
+use crate::models::rm::{RMLine, RemoveRequest, RemoveResponse, SearchResponse};
 
 pub fn config(cfg: &mut web::ServiceConfig) {
-    cfg.service(search_rm_lines)
-        .service(remove_partial_qty);
+    cfg.service(search_rm_lines).service(remove_partial_qty);
 }
 
 #[get("/rm/search")]

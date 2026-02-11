@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use log::info;
 use std::env;
-use tiberius::{Client, Config, Query, AuthMethod, Row};
+use tiberius::{AuthMethod, Client, Config, Query, Row};
 use tokio::net::TcpStream;
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 
@@ -62,7 +62,31 @@ impl MssqlPool {
         results
     }
 
-    pub async fn execute_update(&self, query_str: &str, bind_fn: impl FnOnce(&mut Query<'_>)) -> Result<u64> {
+    pub async fn execute_query_with_params<T, F>(
+        &self,
+        query_str: &str,
+        bind_fn: impl FnOnce(&mut Query<'_>),
+        mapper: F,
+    ) -> Result<Vec<T>>
+    where
+        F: Fn(&Row) -> Result<T>,
+    {
+        let mut client = self.get_client().await?;
+        let mut query = Query::new(query_str);
+        bind_fn(&mut query);
+
+        let stream = query.query(&mut client).await?;
+        let rows = stream.into_first_result().await?;
+
+        let results: Result<Vec<T>> = rows.iter().map(mapper).collect();
+        results
+    }
+
+    pub async fn execute_update(
+        &self,
+        query_str: &str,
+        bind_fn: impl FnOnce(&mut Query<'_>),
+    ) -> Result<u64> {
         let mut client = self.get_client().await?;
         let mut query = Query::new(query_str);
         bind_fn(&mut query);
@@ -82,15 +106,11 @@ pub fn get_string(row: &Row, col: &str) -> String {
 }
 
 pub fn get_i32(row: &Row, col: &str) -> i32 {
-    row.try_get::<i32, _>(col)
-        .unwrap_or(None)
-        .unwrap_or(0)
+    row.try_get::<i32, _>(col).unwrap_or(None).unwrap_or(0)
 }
 
 pub fn get_f64(row: &Row, col: &str) -> f64 {
-    row.try_get::<f64, _>(col)
-        .unwrap_or(None)
-        .unwrap_or(0.0)
+    row.try_get::<f64, _>(col).unwrap_or(None).unwrap_or(0.0)
 }
 
 pub fn get_optional_f64(row: &Row, col: &str) -> Option<f64> {

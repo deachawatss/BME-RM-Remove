@@ -20,7 +20,10 @@ async fn main() -> std::io::Result<()> {
         .parse::<u16>()
         .expect("SERVER_PORT must be a valid port number");
 
-    info!("Starting RM Partial Pick Remover API server on port {}", server_port);
+    info!(
+        "Starting RM Partial Pick Remover API server on port {}",
+        server_port
+    );
 
     // Initialize MSSQL connection pool
     let db_pool = MssqlPool::new()

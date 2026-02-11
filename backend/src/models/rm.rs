@@ -19,6 +19,7 @@ pub struct RMLine {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct SearchRequest {
     pub runno: i32,
 }

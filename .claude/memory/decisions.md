@@ -13,6 +13,8 @@
 |------|----------|--------|
 | 2026-02-11 | LDAP primary, SQL fallback | NWFTH uses LDAP, but LOCAL users need SQL auth |
 | 2026-02-11 | Audit fields (User8, User9, User3) | Preserve original values and track changes |
+| 2026-02-11 | Parameterized queries for auth | Prevents SQL injection attacks |
+| 2026-02-11 | Password comparison in Rust code | Avoids plaintext password in SQL queries |
 | 2026-02-11 | Custom toast notification system | Better UX than browser alerts, matches NWFTH theme |
 | 2026-02-11 | CSS-based animations (not Framer Motion) | Lighter bundle, sufficient for this app's needs |
 | 2026-02-11 | Button press feedback (scale 0.98) | Provides tactile feedback on click |

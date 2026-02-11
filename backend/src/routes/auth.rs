@@ -16,10 +16,7 @@ const DEFAULT_JWT_SECRET: &str = "rm-partial-pick-remover-secret-key-change-in-p
 const TOKEN_EXPIRATION_HOURS: usize = 8;
 
 #[post("/auth/login")]
-async fn login(
-    pool: web::Data<MssqlPool>,
-    request: web::Json<LoginRequest>,
-) -> impl Responder {
+async fn login(pool: web::Data<MssqlPool>, request: web::Json<LoginRequest>) -> impl Responder {
     let LoginRequest { username, password } = request.into_inner();
 
     info!("Login attempt for user: {}", username);
@@ -77,32 +74,51 @@ async fn handle_local_login(
     username: String,
     password: String,
 ) -> HttpResponse {
-    let sql = format!(
-        r#"
-        SELECT UserLogon, UserName
+    // Use parameterized query to prevent SQL injection
+    // TODO: Implement bcrypt password hashing in production
+    let sql = r#"
+        SELECT UserLogon, UserName, Password
         FROM Users
-        WHERE UserLogon = '{}' AND Password = '{}' AND Active = 1
-        "#,
-        username, password
-    );
+        WHERE UserLogon = @P1 AND Active = 1
+        "#;
 
     let result = pool
-        .execute_query(&sql, |row| {
-            Ok(UserInfo {
-                username: get_string(row, "UserLogon"),
-                display_name: get_string(row, "UserName"),
-            })
-        })
+        .execute_query_with_params(
+            sql,
+            move |query| {
+                query.bind(username.clone());
+            },
+            |row| {
+                Ok((
+                    get_string(row, "UserLogon"),
+                    get_string(row, "UserName"),
+                    get_string(row, "Password"),
+                ))
+            },
+        )
         .await;
 
     match result {
         Ok(users) if !users.is_empty() => {
-            let user = &users[0];
+            let (user_logon, user_name, stored_password) = &users[0];
+            // TODO: Use bcrypt::verify in production for secure password comparison
+            if *stored_password != password {
+                return HttpResponse::Unauthorized().json(LoginResponse {
+                    success: false,
+                    token: None,
+                    user: None,
+                    message: "Invalid username or password".to_string(),
+                });
+            }
+            let user = UserInfo {
+                username: user_logon.clone(),
+                display_name: user_name.clone(),
+            };
             match generate_token(&user.username) {
                 Ok(token) => HttpResponse::Ok().json(LoginResponse {
                     success: true,
                     token: Some(token),
-                    user: Some(user.clone()),
+                    user: Some(user),
                     message: "Login successful".to_string(),
                 }),
                 Err(e) => {
@@ -139,34 +155,56 @@ async fn handle_sql_fallback(
     username: String,
     password: String,
 ) -> HttpResponse {
-    info!("Attempting SQL fallback authentication for user: {}", username);
-
-    let sql = format!(
-        r#"
-        SELECT UserLogon, UserName
-        FROM Users
-        WHERE UserLogon = '{}' AND Password = '{}' AND Active = 1
-        "#,
-        username, password
+    info!(
+        "Attempting SQL fallback authentication for user: {}",
+        username
     );
 
+    // Use parameterized query to prevent SQL injection
+    // TODO: Implement bcrypt password hashing in production
+    let sql = r#"
+        SELECT UserLogon, UserName, Password
+        FROM Users
+        WHERE UserLogon = @P1 AND Active = 1
+        "#;
+
     let result = pool
-        .execute_query(&sql, |row| {
-            Ok(UserInfo {
-                username: get_string(row, "UserLogon"),
-                display_name: get_string(row, "UserName"),
-            })
-        })
+        .execute_query_with_params(
+            sql,
+            move |query| {
+                query.bind(username.clone());
+            },
+            |row| {
+                Ok((
+                    get_string(row, "UserLogon"),
+                    get_string(row, "UserName"),
+                    get_string(row, "Password"),
+                ))
+            },
+        )
         .await;
 
     match result {
         Ok(users) if !users.is_empty() => {
-            let user = &users[0];
+            let (user_logon, user_name, stored_password) = &users[0];
+            // TODO: Use bcrypt::verify in production for secure password comparison
+            if *stored_password != password {
+                return HttpResponse::Unauthorized().json(LoginResponse {
+                    success: false,
+                    token: None,
+                    user: None,
+                    message: "Invalid username or password".to_string(),
+                });
+            }
+            let user = UserInfo {
+                username: user_logon.clone(),
+                display_name: user_name.clone(),
+            };
             match generate_token(&user.username) {
                 Ok(token) => HttpResponse::Ok().json(LoginResponse {
                     success: true,
                     token: Some(token),
-                    user: Some(user.clone()),
+                    user: Some(user),
                     message: "Login successful (SQL fallback)".to_string(),
                 }),
                 Err(e) => {
@@ -198,8 +236,12 @@ async fn handle_sql_fallback(
     }
 }
 
-async fn authenticate_ldap(username: &str, _password: &str) -> Result<bool, Box<dyn std::error::Error>> {
-    let ldap_url = env::var("LDAP_URL").unwrap_or_else(|_| "ldaps://ldap.nwfth.com:636".to_string());
+async fn authenticate_ldap(
+    username: &str,
+    _password: &str,
+) -> Result<bool, Box<dyn std::error::Error>> {
+    let ldap_url =
+        env::var("LDAP_URL").unwrap_or_else(|_| "ldaps://ldap.nwfth.com:636".to_string());
     let _base_dn = env::var("LDAP_BASE_DN").unwrap_or_else(|_| "DC=NWFTH,DC=com".to_string());
     let domain = env::var("LDAP_DOMAIN").unwrap_or_else(|_| "NWFTH.com".to_string());
     let _timeout_secs = env::var("LDAP_TIMEOUT_SECS")
@@ -215,7 +257,10 @@ async fn authenticate_ldap(username: &str, _password: &str) -> Result<bool, Box<
 
     // For now, return false to trigger SQL fallback
     // In production, this would connect to LDAP and authenticate
-    info!("LDAP authentication not fully implemented, would authenticate: {} at {}", user_principal, ldap_url);
+    info!(
+        "LDAP authentication not fully implemented, would authenticate: {} at {}",
+        user_principal, ldap_url
+    );
 
     // Placeholder: In production, implement actual LDAP bind
     // This is a simplified version - real implementation would use ldap3 crate

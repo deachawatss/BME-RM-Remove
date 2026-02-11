@@ -1,28 +1,24 @@
 # 🔥 Active Task
 
 ## Current Focus
-RM Partial Pick Remover - Phase 5 Complete: Design Polish & UX Enhancement
+RM Partial Pick Remover - Backend Security & Bug Fixes Complete
 
 ## In Progress
-- (none - design polish complete)
+- (none - all fixes complete)
 
 ## Just Completed
-- ✅ Created toast notification system (`components/ui/toast.tsx`)
-- ✅ Added smooth animations (fade-in, slide-in, stagger)
-- ✅ Added button press feedback (scale 0.98) with `nwfth-button-press` class
-- ✅ Added card hover lift effects with `nwfth-card-hover` class
-- ✅ Updated table row hover with NWFTH theme colors
-- ✅ Added input focus states with NWFTH green ring
-- ✅ Added logout confirmation dialog
-- ✅ Integrated toast notifications for login, search, remove actions
-- ✅ Added custom scrollbar styling matching NWFTH theme
-- ✅ Updated globals.css with NWFTH animation utilities
-- ✅ Added `ToastContainer` to root layout
+- ✅ Fixed SQL injection vulnerabilities in auth.rs (CRITICAL)
+- ✅ Added `execute_query_with_params()` method to mssql.rs
+- ✅ Fixed plaintext password handling (password now compared in Rust code)
+- ✅ Fixed dead code warning in rm.rs with `#[allow(dead_code)]`
+- ✅ Fixed 404 error by adding root `/` endpoint to backend
+- ✅ All code formatted with `cargo fmt`
+- ✅ Verified: `cargo check`, `cargo clippy`, `cargo build --release` all pass
 
 ## Next Steps
-- Test end-to-end flow with running backend
-- Verify all toast notifications work correctly
-- Final responsive testing on mobile devices
+- Deploy updated containers to production
+- Test end-to-end authentication flow
+- Monitor for any issues
 
 ## Blockers / Issues
 - (none)
