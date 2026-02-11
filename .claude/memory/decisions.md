@@ -21,6 +21,17 @@
 | 2026-02-11 | Card hover lift effect | Visual affordance for interactive elements |
 | 2026-02-11 | Custom scrollbar styling | Consistent NWFTH theme throughout UI |
 | 2026-02-11 | Input focus ring with NWFTH green | Clear focus indicator, matches brand |
+| 2026-02-11 | Login page gradient background | Matches BME-Partial-Picking style |
+| 2026-02-11 | Connection status indicator | Visual feedback for backend connectivity |
+| 2026-02-11 | Health check polling every 30s | Real-time connection status updates |
+
+## Authentication Decisions
+| Date | Decision | Reason |
+|------|----------|--------|
+| 2026-02-11 | Use tbl_user instead of Users | Consistent with BME-Partial-Picking |
+| 2026-02-11 | auth_source field for user type | Distinguishes LOCAL vs LDAP users |
+| 2026-02-11 | Deny LDAP users from SQL fallback | Security - LDAP users must use LDAP |
+| 2026-02-11 | Display name from Fname + Lname | Proper name display from tbl_user |
 
 ## Business Logic
 | Date | Decision | Reason |

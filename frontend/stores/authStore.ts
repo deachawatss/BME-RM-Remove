@@ -76,7 +76,7 @@ async function authenticateWithBackend(
   password: string
 ): Promise<{ success: boolean; user?: User; token?: string; error?: string }> {
   try {
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:6066';
 
     const response = await fetch(`${API_URL}/api/auth/login`, {
       method: 'POST',

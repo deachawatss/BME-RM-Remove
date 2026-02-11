@@ -3,7 +3,7 @@
 ## Project Overview
 - Name: RM Partial Pick Remover
 - Type: Internal ERP Tool for NWFTH
-- Tech Stack: Rust (Actix-web) + MSSQL + React (planned)
+- Tech Stack: Rust (Actix-web) + MSSQL + Next.js + TypeScript
 
 ## Completed Features
 - ✅ Rust backend API with Actix-web
@@ -18,9 +18,12 @@
 - ✅ Zustand state management
 - ✅ API clients for auth and RM operations
 - ✅ Frontend-backend integration complete
+- ✅ Login page with BME-Partial-Picking style UI
+- ✅ Connection status indicator
+- ✅ SQL authentication using tbl_user table
 
 ## Current State
-Full-stack application complete with frontend connected to Rust backend
+Full-stack application complete with frontend connected to Rust backend. Docker containers running on ports 6065 (frontend) and 6066 (backend).
 
 ## Key Files
 ### Backend
@@ -28,20 +31,21 @@ Full-stack application complete with frontend connected to Rust backend
 - `/backend/src/main.rs` - Server setup
 - `/backend/src/db/mssql.rs` - MSSQL connection pool
 - `/backend/src/routes/rm.rs` - RM API endpoints
-- `/backend/src/routes/auth.rs` - Auth endpoints
+- `/backend/src/routes/auth.rs` - Auth endpoints (tbl_user auth)
 - `/backend/src/models/` - Data models
 
 ### Frontend
-- `/frontend/my-app/lib/api/auth.ts` - Auth API client
-- `/frontend/my-app/lib/api/rm.ts` - RM API client
-- `/frontend/my-app/stores/authStore.ts` - Auth state management
-- `/frontend/my-app/stores/rmStore.ts` - RM state management
-- `/frontend/my-app/app/dashboard/page.tsx` - Main dashboard
-- `/frontend/my-app/.env.local` - API URL configuration
+- `/frontend/lib/api/auth.ts` - Auth API client
+- `/frontend/lib/api/rm.ts` - RM API client
+- `/frontend/stores/authStore.ts` - Auth state management
+- `/frontend/stores/rmStore.ts` - RM state management
+- `/frontend/app/login/page.tsx` - Login page with connection status
+- `/frontend/app/dashboard/page.tsx` - Main dashboard
 
 ## API Endpoints
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| GET | /api/health | Health check |
 | POST | /api/auth/login | Login with LDAP/SQL |
 | GET | /api/rm/search?runno={id} | Search RM lines |
 | POST | /api/rm/remove | Remove partial quantities |
@@ -49,8 +53,10 @@ Full-stack application complete with frontend connected to Rust backend
 ## Important Notes
 - Uses cust_PartialPicked table
 - Audit trail: User8, User9, User3 fields
-- LDAP auth with SQL fallback for LOCAL users
-- Server runs on port 8080
+- LDAP auth with SQL fallback for LOCAL users only
+- SQL auth uses tbl_user table (uname, Fname, Lname, pword, auth_source)
+- Frontend runs on port 6065
+- Backend runs on port 6066
 
 ---
 *Last updated: 2026-02-11*

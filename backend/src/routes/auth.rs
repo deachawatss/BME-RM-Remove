@@ -75,11 +75,11 @@ async fn handle_local_login(
     password: String,
 ) -> HttpResponse {
     // Use parameterized query to prevent SQL injection
-    // TODO: Implement bcrypt password hashing in production
+    // Query tbl_user table for LOCAL authentication
     let sql = r#"
-        SELECT UserLogon, UserName, Password
-        FROM Users
-        WHERE UserLogon = @P1 AND Active = 1
+        SELECT uname, Fname, Lname, pword, auth_source
+        FROM tbl_user
+        WHERE uname = @P1 AND auth_source = 'LOCAL'
         "#;
 
     let result = pool
@@ -90,9 +90,11 @@ async fn handle_local_login(
             },
             |row| {
                 Ok((
-                    get_string(row, "UserLogon"),
-                    get_string(row, "UserName"),
-                    get_string(row, "Password"),
+                    get_string(row, "uname"),
+                    get_string(row, "Fname"),
+                    get_string(row, "Lname"),
+                    get_string(row, "pword"),
+                    get_string(row, "auth_source"),
                 ))
             },
         )
@@ -100,8 +102,19 @@ async fn handle_local_login(
 
     match result {
         Ok(users) if !users.is_empty() => {
-            let (user_logon, user_name, stored_password) = &users[0];
-            // TODO: Use bcrypt::verify in production for secure password comparison
+            let (uname, fname, lname, stored_password, auth_source) = &users[0];
+
+            // Verify this is a LOCAL user
+            if auth_source != "LOCAL" {
+                return HttpResponse::Unauthorized().json(LoginResponse {
+                    success: false,
+                    token: None,
+                    user: None,
+                    message: "Invalid authentication method for this user".to_string(),
+                });
+            }
+
+            // Plaintext password comparison (matches BME-Partial-Picking)
             if *stored_password != password {
                 return HttpResponse::Unauthorized().json(LoginResponse {
                     success: false,
@@ -110,10 +123,14 @@ async fn handle_local_login(
                     message: "Invalid username or password".to_string(),
                 });
             }
+
+            // Combine Fname and Lname for display name
+            let display_name = format!("{} {}", fname, lname).trim().to_string();
             let user = UserInfo {
-                username: user_logon.clone(),
-                display_name: user_name.clone(),
+                username: uname.clone(),
+                display_name: if display_name.is_empty() { uname.clone() } else { display_name },
             };
+
             match generate_token(&user.username) {
                 Ok(token) => HttpResponse::Ok().json(LoginResponse {
                     success: true,
@@ -160,25 +177,30 @@ async fn handle_sql_fallback(
         username
     );
 
+    // Clone username for the closure to avoid move issues
+    let username_for_query = username.clone();
+
     // Use parameterized query to prevent SQL injection
-    // TODO: Implement bcrypt password hashing in production
+    // Query tbl_user table - only allow LOCAL users for SQL fallback
     let sql = r#"
-        SELECT UserLogon, UserName, Password
-        FROM Users
-        WHERE UserLogon = @P1 AND Active = 1
+        SELECT uname, Fname, Lname, pword, auth_source
+        FROM tbl_user
+        WHERE uname = @P1
         "#;
 
     let result = pool
         .execute_query_with_params(
             sql,
             move |query| {
-                query.bind(username.clone());
+                query.bind(username_for_query);
             },
             |row| {
                 Ok((
-                    get_string(row, "UserLogon"),
-                    get_string(row, "UserName"),
-                    get_string(row, "Password"),
+                    get_string(row, "uname"),
+                    get_string(row, "Fname"),
+                    get_string(row, "Lname"),
+                    get_string(row, "pword"),
+                    get_string(row, "auth_source"),
                 ))
             },
         )
@@ -186,8 +208,34 @@ async fn handle_sql_fallback(
 
     match result {
         Ok(users) if !users.is_empty() => {
-            let (user_logon, user_name, stored_password) = &users[0];
-            // TODO: Use bcrypt::verify in production for secure password comparison
+            let (uname, fname, lname, stored_password, auth_source) = &users[0];
+
+            // Only allow SQL fallback for LOCAL users
+            // LDAP users must authenticate via LDAP
+            if auth_source == "LDAP" {
+                warn!(
+                    "LDAP user {} attempted SQL fallback - denied",
+                    username
+                );
+                return HttpResponse::Unauthorized().json(LoginResponse {
+                    success: false,
+                    token: None,
+                    user: None,
+                    message: "LDAP users must authenticate via LDAP".to_string(),
+                });
+            }
+
+            // Only LOCAL users can use SQL fallback
+            if auth_source != "LOCAL" {
+                return HttpResponse::Unauthorized().json(LoginResponse {
+                    success: false,
+                    token: None,
+                    user: None,
+                    message: "Invalid authentication method for this user".to_string(),
+                });
+            }
+
+            // Plaintext password comparison (matches BME-Partial-Picking)
             if *stored_password != password {
                 return HttpResponse::Unauthorized().json(LoginResponse {
                     success: false,
@@ -196,10 +244,14 @@ async fn handle_sql_fallback(
                     message: "Invalid username or password".to_string(),
                 });
             }
+
+            // Combine Fname and Lname for display name
+            let display_name = format!("{} {}", fname, lname).trim().to_string();
             let user = UserInfo {
-                username: user_logon.clone(),
-                display_name: user_name.clone(),
+                username: uname.clone(),
+                display_name: if display_name.is_empty() { uname.clone() } else { display_name },
             };
+
             match generate_token(&user.username) {
                 Ok(token) => HttpResponse::Ok().json(LoginResponse {
                     success: true,
