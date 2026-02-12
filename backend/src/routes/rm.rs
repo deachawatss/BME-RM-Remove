@@ -131,7 +131,7 @@ async fn remove_partial_qty(
         UPDATE cust_PartialPicked
         SET
             User8 = ToPickedPartialQty,
-            User9 = CAST(DATEDIFF(SECOND, '1970-01-01', GETDATE()) AS DECIMAL),
+            User9 = CAST(CONVERT(VARCHAR(8), GETDATE(), 112) AS DECIMAL(18,0)),
             User3 = LEFT(@P1, 8),
             ToPickedPartialQty = 0,
             ModifiedBy = LEFT(@P1, 8),
