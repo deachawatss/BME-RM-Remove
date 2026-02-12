@@ -3,10 +3,9 @@
 //! Provides a high-level async LDAP client with connection pooling support
 //! and comprehensive error handling for Active Directory authentication.
 
-use ldap3::{Ldap, LdapConnAsync, Scope, SearchEntry};
+use ldap3::{Ldap, LdapConnAsync, LdapConnSettings, Scope, SearchEntry};
 use log::{debug, error, info, warn};
 use tokio::time::timeout;
-use url::Url;
 
 use crate::ldap::config::LdapConfig;
 use crate::ldap::error::{LdapError, LdapResult};
@@ -42,23 +41,6 @@ impl LdapClient {
     /// * `LdapError::AuthError` - Invalid credentials
     /// * `LdapError::UserNotFound` - User not found in directory
     /// * `LdapError::TimeoutError` - Operation timed out
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// use crate::ldap::{LdapClient, LdapConfig};
-    ///
-    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// let config = LdapConfig::from_env()?;
-    /// let client = LdapClient::new(config);
-    ///
-    /// match client.authenticate("deachawat", "password").await {
-    ///     Ok(user) => println!("Welcome, {}", user.display_name),
-    ///     Err(e) => println!("Authentication failed: {}", e),
-    /// }
-    /// # Ok(())
-    /// # }
-    /// ```
     pub async fn authenticate(&self, username: &str, password: &str) -> LdapResult<LdapUser> {
         let upn = self.config.build_upn(username);
         let clean_username = self.config.extract_username(username);
@@ -114,18 +96,29 @@ impl LdapClient {
     }
 
     /// Connect to the LDAP server
+    /// Uses LdapConnSettings to configure TLS certificate verification
     pub async fn connect(&self) -> LdapResult<Ldap> {
         debug!(
             "Connecting to LDAP server: {} (verify_certs: {})",
             self.config.url, self.config.verify_certs
         );
 
-        // Parse the URL
-        let url = Url::parse(&self.config.url).map_err(|e| {
-            LdapError::ConfigError(format!("Invalid LDAP URL: {}", e))
-        })?;
+        // Build connection settings with TLS configuration
+        let settings = if !self.config.verify_certs {
+            info!("TLS certificate verification DISABLED (internal network)");
+            let tls_connector = native_tls::TlsConnector::builder()
+                .danger_accept_invalid_certs(true)
+                .danger_accept_invalid_hostnames(true)
+                .build()
+                .map_err(|e| LdapError::ConnectionError(format!("TLS connector error: {}", e)))?;
+            LdapConnSettings::new()
+                .set_connector(tls_connector)
+                .set_no_tls_verify(true)
+        } else {
+            LdapConnSettings::new()
+        };
 
-        let connect_future = LdapConnAsync::from_url(&url);
+        let connect_future = LdapConnAsync::with_settings(settings, &self.config.url);
 
         let (conn, ldap) = match timeout(self.config.timeout, connect_future).await {
             Ok(Ok(result)) => result,

@@ -17,8 +17,8 @@ interface RMState {
   /** Array of RM lines from current search */
   lines: RMLine[];
 
-  /** Set of selected row numbers */
-  selectedRows: Set<number>;
+  /** Set of selected row composite keys (RowNum-LineId) */
+  selectedRows: Set<string>;
 
   /** Current RunNo being searched */
   currentRunNo: number | null;
@@ -44,10 +44,10 @@ interface RMActions {
   remove: () => Promise<RMRemoveResponse>;
 
   /** Set the entire selection set (used by RMDataTable) */
-  setSelection: (selectedRows: Set<number>) => void;
+  setSelection: (selectedRows: Set<string>) => void;
 
   /** Toggle selection of a row */
-  toggleSelection: (rowNum: number) => void;
+  toggleSelection: (rowNum: number, lineId: number) => void;
 
   /** Select all selectable rows */
   selectAll: () => void;
@@ -84,7 +84,14 @@ const createInitialState = (): RMState => ({
  * ToPickedPartialQty > 0 AND PickedPartialQty <= 0
  */
 function isRowSelectable(row: RMLine): boolean {
-  return row.ToPickedPartialQty > 0 && row.PickedPartialQty <= 0;
+  return row.ToPickedPartialQty > 0 && (row.PickedPartialQty === null || row.PickedPartialQty <= 0);
+}
+
+/**
+ * Helper to generate composite key
+ */
+function getRowKey(rowNum: number, lineId: number): string {
+  return `${rowNum}-${lineId}`;
 }
 
 /**
@@ -139,12 +146,20 @@ export const useRMStore = create<RMStore>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      const rowNums = Array.from(selectedRows);
-      const result = await removeRM(currentRunNo, rowNums, user.username);
+      // Convert selected keys back to items
+      const itemsToRemove = Array.from(selectedRows).map(key => {
+        const [rowNumStr, lineIdStr] = key.split('-');
+        return {
+          rowNum: parseInt(rowNumStr, 10),
+          lineId: parseInt(lineIdStr, 10)
+        };
+      });
+
+      const result = await removeRM(currentRunNo, itemsToRemove, user.username);
 
       // Remove the processed rows from local state
       set((state) => ({
-        lines: state.lines.filter((line) => !selectedRows.has(line.RowNum)),
+        lines: state.lines.filter((line) => !selectedRows.has(getRowKey(line.RowNum, line.LineId))),
         selectedRows: new Set(),
         isLoading: false,
       }));
@@ -159,17 +174,18 @@ export const useRMStore = create<RMStore>((set, get) => ({
     }
   },
 
-  setSelection: (selectedRows: Set<number>) => {
+  setSelection: (selectedRows: Set<string>) => {
     set({ selectedRows });
   },
 
-  toggleSelection: (rowNum: number) => {
+  toggleSelection: (rowNum: number, lineId: number) => {
+    const key = getRowKey(rowNum, lineId);
     set((state) => {
       const newSelected = new Set(state.selectedRows);
-      if (newSelected.has(rowNum)) {
-        newSelected.delete(rowNum);
+      if (newSelected.has(key)) {
+        newSelected.delete(key);
       } else {
-        newSelected.add(rowNum);
+        newSelected.add(key);
       }
       return { selectedRows: newSelected };
     });
@@ -177,10 +193,10 @@ export const useRMStore = create<RMStore>((set, get) => ({
 
   selectAll: () => {
     set((state) => {
-      const selectableRowNums = state.lines
+      const selectableKeys = state.lines
         .filter(isRowSelectable)
-        .map((line) => line.RowNum);
-      return { selectedRows: new Set(selectableRowNums) };
+        .map((line) => getRowKey(line.RowNum, line.LineId));
+      return { selectedRows: new Set(selectableKeys) };
     });
   },
 
@@ -208,7 +224,7 @@ export function useSelectableCount(): number {
 /**
  * Hook to check if a specific row is selected
  */
-export function useIsRowSelected(rowNum: number): boolean {
+export function useIsRowSelected(rowNum: number, lineId: number): boolean {
   const { selectedRows } = useRMStore();
-  return selectedRows.has(rowNum);
+  return selectedRows.has(getRowKey(rowNum, lineId));
 }

@@ -56,7 +56,7 @@ async fn search_rm_lines(
         WHERE RunNo = {}
           AND ToPickedPartialQty > 0
           AND (PickedPartialQty IS NULL OR PickedPartialQty <= 0)
-        ORDER BY RowNum
+        ORDER BY BatchNo, LineId, ItemKey
         "#,
         runno
     );
@@ -110,21 +110,21 @@ async fn remove_partial_qty(
 ) -> impl Responder {
     let RemoveRequest {
         run_no,
-        row_nums,
+        items,
         user_logon,
     } = request.into_inner();
 
-    if row_nums.is_empty() {
+    if items.is_empty() {
         return HttpResponse::BadRequest().json(RemoveResponse {
             success: false,
-            message: "No row numbers provided".to_string(),
+            message: "No items provided".to_string(),
             affected_rows: 0,
         });
     }
 
     info!(
-        "Removing partial quantities for RunNo: {}, Rows: {:?}, User: {}",
-        run_no, row_nums, user_logon
+        "Removing partial quantities for RunNo: {}, Items: {:?}, User: {}",
+        run_no, items, user_logon
     );
 
     let sql = r#"
@@ -138,19 +138,24 @@ async fn remove_partial_qty(
             ModifiedDate = GETDATE()
         WHERE RunNo = @P2
           AND RowNum = @P3
+          AND LineId = @P4
           AND ToPickedPartialQty > 0
     "#;
 
     let mut total_affected: u64 = 0;
     let mut errors: Vec<String> = vec![];
 
-    for row_num in &row_nums {
+    for item in &items {
         let user_logon_clone = user_logon.clone();
+        let current_row = item.row_num;
+        let current_line = item.line_id;
+        
         let result = pool
             .execute_update(sql, |query| {
                 query.bind(user_logon_clone.clone());
                 query.bind(run_no);
-                query.bind(*row_num);
+                query.bind(current_row);
+                query.bind(current_line);
             })
             .await;
 
@@ -158,12 +163,12 @@ async fn remove_partial_qty(
             Ok(affected) => {
                 total_affected += affected;
                 if affected == 0 {
-                    errors.push(format!("Row {} not found or already processed", row_num));
+                    errors.push(format!("Item (Row: {}, Line: {}) not found or already processed", current_row, current_line));
                 }
             }
             Err(e) => {
-                error!("Error updating row {}: {}", row_num, e);
-                errors.push(format!("Row {}: {}", row_num, e));
+                error!("Error updating item (Row: {}, Line: {}): {}", current_row, current_line, e);
+                errors.push(format!("Item (Row: {}, Line: {}): {}", current_row, current_line, e));
             }
         }
     }

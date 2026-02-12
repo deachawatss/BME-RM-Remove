@@ -5,10 +5,18 @@
  * Connects to Rust backend for RM partial picking operations
  */
 
-import { RMLine, RMRemoveResponse } from '@/types/rm';
+import { RMLine, RMRemoveResponse, RMRemoveItem } from '@/types/rm';
 import { getToken } from './auth';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+/**
+ * Get API URL based on current hostname
+ * This ensures it works regardless of how the app is accessed
+ */
+function getApiUrl(): string {
+  if (typeof window === 'undefined') return 'http://127.0.0.1:6066';
+  const { protocol, hostname } = window.location;
+  return `${protocol}//${hostname}:6066`;
+}
 
 /**
  * RM API error class
@@ -38,7 +46,7 @@ interface SearchRMResponse {
  */
 interface RemoveRMRequest {
   run_no: number;
-  row_nums: number[];
+  items: { row_num: number; line_id: number }[];
   user_logon: string;
 }
 
@@ -79,7 +87,7 @@ export async function searchRM(runno: number): Promise<RMLine[]> {
     const headers = getAuthHeaders();
 
     const response = await fetch(
-      `${API_URL}/api/rm/search?runno=${encodeURIComponent(runno)}`,
+      `${getApiUrl()}/api/rm/search?runno=${encodeURIComponent(runno)}`,
       {
         method: 'GET',
         headers,
@@ -120,14 +128,14 @@ export async function searchRM(runno: number): Promise<RMLine[]> {
  * Remove partial picking entries for selected rows
  *
  * @param runNo - The RunNo being processed
- * @param rowNums - Array of row numbers to remove
+ * @param items - Array of items (rowNum, lineId) to remove
  * @param userLogon - Username of the operator performing the removal
  * @returns Remove response with affected count
  * @throws RMApiError if removal fails or not authenticated
  */
 export async function removeRM(
   runNo: number,
-  rowNums: number[],
+  items: RMRemoveItem[],
   userLogon: string
 ): Promise<RMRemoveResponse> {
   try {
@@ -135,11 +143,14 @@ export async function removeRM(
 
     const payload: RemoveRMRequest = {
       run_no: runNo,
-      row_nums: rowNums,
+      items: items.map(item => ({
+        row_num: item.rowNum,
+        line_id: item.lineId,
+      })),
       user_logon: userLogon,
     };
 
-    const response = await fetch(`${API_URL}/api/rm/remove`, {
+    const response = await fetch(`${getApiUrl()}/api/rm/remove`, {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
@@ -164,7 +175,7 @@ export async function removeRM(
 
     return {
       success: true,
-      affectedCount: data.affected_count || rowNums.length,
+      affectedCount: data.affected_count || items.length,
     };
   } catch (error) {
     if (error instanceof RMApiError) {

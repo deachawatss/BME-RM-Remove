@@ -21,14 +21,21 @@ interface RMDataTableProps {
   /** Array of RM lines to display */
   data: RMLine[];
 
-  /** Set of selected row numbers */
-  selectedRows: Set<number>;
+  /** Set of selected row composite keys (RowNum-LineId) */
+  selectedRows: Set<string>;
 
   /** Callback when selection changes */
-  onSelectionChange: (selectedRows: Set<number>) => void;
+  onSelectionChange: (selectedRows: Set<string>) => void;
 
   /** Whether data is loading */
   isLoading?: boolean;
+}
+
+/**
+ * Helper to generate composite key
+ */
+function getRowKey(row: RMLine): string {
+  return `${row.RowNum}-${row.LineId}`;
 }
 
 /**
@@ -49,22 +56,27 @@ export function RMDataTable({
   onSelectionChange,
   isLoading = false,
 }: RMDataTableProps) {
+  // Sort data: biggest ToPickedPartialQty first
+  const sortedData = useMemo(() => {
+    return [...data].sort((a, b) => (b.ToPickedPartialQty ?? 0) - (a.ToPickedPartialQty ?? 0));
+  }, [data]);
+
   // Calculate selectable rows
   const selectableRows = useMemo(() => {
-    return data.filter(isRowSelectable);
-  }, [data]);
+    return sortedData.filter(isRowSelectable);
+  }, [sortedData]);
 
   // Check if all selectable rows are selected
   const allSelected = useMemo(() => {
     if (selectableRows.length === 0) return false;
-    return selectableRows.every((row) => selectedRows.has(row.RowNum));
+    return selectableRows.every((row) => selectedRows.has(getRowKey(row)));
   }, [selectableRows, selectedRows]);
 
   // Check if some (but not all) selectable rows are selected
   const someSelected = useMemo(() => {
     if (selectableRows.length === 0) return false;
     const selectedCount = selectableRows.filter((row) =>
-      selectedRows.has(row.RowNum)
+      selectedRows.has(getRowKey(row))
     ).length;
     return selectedCount > 0 && selectedCount < selectableRows.length;
   }, [selectableRows, selectedRows]);
@@ -74,12 +86,12 @@ export function RMDataTable({
     if (checked) {
       // Select all selectable rows
       const newSelected = new Set(selectedRows);
-      selectableRows.forEach((row) => newSelected.add(row.RowNum));
+      selectableRows.forEach((row) => newSelected.add(getRowKey(row)));
       onSelectionChange(newSelected);
     } else {
       // Deselect all rows in current data
       const newSelected = new Set(selectedRows);
-      data.forEach((row) => newSelected.delete(row.RowNum));
+      data.forEach((row) => newSelected.delete(getRowKey(row)));
       onSelectionChange(newSelected);
     }
   };
@@ -87,17 +99,18 @@ export function RMDataTable({
   // Handle individual row selection
   const handleSelectRow = (row: RMLine, checked: boolean) => {
     const newSelected = new Set(selectedRows);
+    const key = getRowKey(row);
     if (checked) {
-      newSelected.add(row.RowNum);
+      newSelected.add(key);
     } else {
-      newSelected.delete(row.RowNum);
+      newSelected.delete(key);
     }
     onSelectionChange(newSelected);
   };
 
   // Format number with 2 decimal places
-  const formatNumber = (num: number): string => {
-    return num.toFixed(2);
+  const formatNumber = (num: number | null | undefined): string => {
+    return (num ?? 0).toFixed(2);
   };
 
   // Get row status indicator
@@ -167,7 +180,7 @@ export function RMDataTable({
             style={{ backgroundColor: NWFTH_COLORS.backgroundWarm }}
           >
             <TableRow style={{ borderColor: NWFTH_COLORS.border }}>
-              <TableHead className="w-12 px-2">
+              <TableHead className="w-12 px-4">
                 <Checkbox
                   checked={allSelected}
                   data-state={someSelected ? 'indeterminate' : allSelected ? 'checked' : 'unchecked'}
@@ -175,52 +188,39 @@ export function RMDataTable({
                   aria-label="Select all selectable rows"
                 />
               </TableHead>
-              <TableHead className="text-xs font-semibold" style={{ color: NWFTH_COLORS.textPrimary }}>
-                BatchNo
-              </TableHead>
-              <TableHead className="text-xs font-semibold" style={{ color: NWFTH_COLORS.textPrimary }}>
-                Type
-              </TableHead>
-              <TableHead className="text-xs font-semibold" style={{ color: NWFTH_COLORS.textPrimary }}>
-                LineID
-              </TableHead>
-              <TableHead className="text-xs font-semibold" style={{ color: NWFTH_COLORS.textPrimary }}>
+              <TableHead className="text-sm font-bold" style={{ color: NWFTH_COLORS.textPrimary }}>
                 ItemKey
               </TableHead>
-              <TableHead className="text-xs font-semibold" style={{ color: NWFTH_COLORS.textPrimary }}>
-                Location
+              <TableHead className="text-sm font-bold" style={{ color: NWFTH_COLORS.textPrimary }}>
+                BatchNo
               </TableHead>
-              <TableHead className="text-xs font-semibold text-right" style={{ color: NWFTH_COLORS.textPrimary }}>
-                Std Qty
+              <TableHead className="text-sm font-bold" style={{ color: NWFTH_COLORS.textPrimary }}>
+                LineID
               </TableHead>
-              <TableHead className="text-xs font-semibold text-right" style={{ color: NWFTH_COLORS.textPrimary }}>
-                Pack Size
+              <TableHead className="text-sm font-bold" style={{ color: NWFTH_COLORS.textPrimary }}>
+                Type
               </TableHead>
-              <TableHead className="text-xs font-semibold text-right" style={{ color: NWFTH_COLORS.textPrimary }}>
-                To Pick
-              </TableHead>
-              <TableHead className="text-xs font-semibold text-right" style={{ color: NWFTH_COLORS.textPrimary }}>
-                Picked
-              </TableHead>
-              <TableHead className="text-xs font-semibold" style={{ color: NWFTH_COLORS.textPrimary }}>
+
+              <TableHead className="text-sm font-bold" style={{ color: NWFTH_COLORS.textPrimary }}>
                 Status
               </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((row) => {
+            {sortedData.map((row) => {
               const selectable = isRowSelectable(row);
               const status = getRowStatus(row);
+              const rowKey = getRowKey(row);
 
               return (
                 <TableRow
-                  key={row.RowNum}
+                  key={rowKey}
                   style={{ borderColor: NWFTH_COLORS.borderLight }}
                   className={selectable ? 'nwfth-row-hover hover:bg-[#F5F1EB]' : 'bg-[#FAF8F4]/50'}
                 >
-                  <TableCell className="px-2">
+                  <TableCell className="px-4">
                     <Checkbox
-                      checked={selectedRows.has(row.RowNum)}
+                      checked={selectedRows.has(rowKey)}
                       onCheckedChange={(checked) =>
                         handleSelectRow(row, checked as boolean)
                       }
@@ -229,49 +229,31 @@ export function RMDataTable({
                     />
                   </TableCell>
                   <TableCell
-                    className="text-sm font-medium"
-                    style={{ color: NWFTH_COLORS.textPrimary }}
-                  >
-                    {row.BatchNo}
-                  </TableCell>
-                  <TableCell
-                    className="text-sm"
-                    style={{ color: NWFTH_COLORS.textSecondary }}
-                  >
-                    {row.LineTyp}
-                  </TableCell>
-                  <TableCell
-                    className="text-sm"
-                    style={{ color: NWFTH_COLORS.textSecondary }}
-                  >
-                    {row.LineId}
-                  </TableCell>
-                  <TableCell
-                    className="text-sm font-medium"
+                    className="text-base font-medium"
                     style={{ color: NWFTH_COLORS.textPrimary }}
                   >
                     {row.ItemKey}
                   </TableCell>
                   <TableCell
-                    className="text-sm"
-                    style={{ color: NWFTH_COLORS.textSecondary }}
+                    className="text-base font-medium"
+                    style={{ color: NWFTH_COLORS.textPrimary }}
                   >
-                    {row.Location}
+                    {row.BatchNo}
                   </TableCell>
                   <TableCell
-                    className="text-sm text-right"
+                    className="text-base"
                     style={{ color: NWFTH_COLORS.textSecondary }}
                   >
-                    {formatNumber(row.StandardQty)}
+                    {row.LineId}
                   </TableCell>
                   <TableCell
-                    className="text-sm text-right"
+                    className="text-base"
                     style={{ color: NWFTH_COLORS.textSecondary }}
                   >
-                    {formatNumber(row.PackSize)}
+                    {row.LineTyp}
                   </TableCell>
                   <TableCell
-                    className="text-sm text-right font-medium"
+                    className="text-base text-right font-medium"
                     style={{
                       color:
                         row.ToPickedPartialQty > 0
@@ -280,17 +262,6 @@ export function RMDataTable({
                     }}
                   >
                     {formatNumber(row.ToPickedPartialQty)}
-                  </TableCell>
-                  <TableCell
-                    className="text-sm text-right"
-                    style={{
-                      color:
-                        row.PickedPartialQty > 0
-                          ? NWFTH_COLORS.accentGold
-                          : NWFTH_COLORS.textSecondary,
-                    }}
-                  >
-                    {formatNumber(row.PickedPartialQty)}
                   </TableCell>
                   <TableCell>
                     <span

@@ -19,6 +19,9 @@ interface RunNoInputProps {
   /** Callback when search is triggered */
   onSearch: (runNo: number) => void;
 
+  /** Callback when clear is triggered */
+  onClear?: () => void;
+
   /** Whether search is in progress */
   isLoading?: boolean;
 
@@ -34,6 +37,7 @@ export function RunNoInput({
   value,
   onChange,
   onSearch,
+  onClear,
   isLoading = false,
   error,
 }: RunNoInputProps) {
@@ -55,6 +59,7 @@ export function RunNoInput({
   const handleClear = () => {
     onChange('');
     setLocalError(null);
+    onClear?.();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

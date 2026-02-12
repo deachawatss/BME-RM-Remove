@@ -69,8 +69,8 @@ export interface RMFilterCriteria {
  * Selection state for RM lines
  */
 export interface RMSelectionState {
-  /** Set of selected row numbers */
-  selectedRows: Set<number>;
+  /** Set of selected row composite keys (RowNum-LineId) */
+  selectedRows: Set<string>;
 
   /** Whether all selectable rows are selected */
   isAllSelected: boolean;
@@ -97,14 +97,22 @@ export interface RMDataResponse {
 }
 
 /**
+ * Item to be removed
+ */
+export interface RMRemoveItem {
+  rowNum: number;
+  lineId: number;
+}
+
+/**
  * Remove operation request
  */
 export interface RMRemoveRequest {
   /** Run number */
   runNo: number;
 
-  /** Array of row numbers to remove */
-  rowNumbers: number[];
+  /** Array of items to remove */
+  items: RMRemoveItem[];
 
   /** User performing the operation */
   userId: string;

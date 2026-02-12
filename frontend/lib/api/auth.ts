@@ -7,7 +7,15 @@
 
 import { User } from '@/stores/authStore';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+/**
+ * Get API URL based on current hostname
+ * This ensures it works regardless of how the app is accessed
+ */
+function getApiUrl(): string {
+  if (typeof window === 'undefined') return 'http://127.0.0.1:6066';
+  const { protocol, hostname } = window.location;
+  return `${protocol}//${hostname}:6066`;
+}
 
 /**
  * Login response from backend
@@ -16,6 +24,7 @@ interface LoginResponse {
   success: boolean;
   token?: string;
   user?: User;
+  message?: string;
   error?: string;
 }
 
@@ -50,7 +59,7 @@ export class AuthError extends Error {
  */
 export async function login(credentials: LoginCredentials): Promise<LoginResponse> {
   try {
-    const response = await fetch(`${API_URL}/api/auth/login`, {
+    const response = await fetch(`${getApiUrl()}/api/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -62,7 +71,7 @@ export async function login(credentials: LoginCredentials): Promise<LoginRespons
 
     if (!response.ok) {
       throw new AuthError(
-        data.error || `Authentication failed (${response.status})`,
+        data.message || data.error || `Authentication failed (${response.status})`,
         response.status
       );
     }

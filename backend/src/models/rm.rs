@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 
+/// Serialize with PascalCase field names to match frontend TypeScript types
+/// e.g. run_no → RunNo, batch_no → BatchNo
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
 pub struct RMLine {
     pub run_no: i32,
     pub row_num: i32,
@@ -25,9 +28,15 @@ pub struct SearchRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct RemoveItem {
+    pub row_num: i32,
+    pub line_id: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RemoveRequest {
     pub run_no: i32,
-    pub row_nums: Vec<i32>,
+    pub items: Vec<RemoveItem>,
     pub user_logon: String,
 }
 

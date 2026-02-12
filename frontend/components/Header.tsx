@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/button';
 import { LogOut, User } from 'lucide-react';
@@ -42,16 +43,15 @@ export function Header() {
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           {/* Logo and Title */}
           <div className="flex items-center gap-3">
-            {/* NWFTH Logo Placeholder */}
-            <div
-              className="nwfth-card-hover flex h-10 w-10 items-center justify-center rounded-lg font-bold text-lg"
-              style={{
-                backgroundColor: NWFTH_COLORS.accentGold,
-                color: NWFTH_COLORS.primaryBrown,
-              }}
-            >
-              N
-            </div>
+            {/* NWFTH Logo */}
+            <Image
+              src="/nwflogo.png"
+              alt="NWFTH Logo"
+              width={100}
+              height={100}
+              className="rounded-lg object-contain"
+              priority
+            />
             <div className="flex flex-col">
               <h1
                 className="text-base font-semibold md:text-lg"
@@ -59,12 +59,6 @@ export function Header() {
               >
                 RM Partial Picking Remover
               </h1>
-              <span
-                className="text-xs hidden sm:block"
-                style={{ color: NWFTH_COLORS.textMuted }}
-              >
-                Northern Wind Food Thailand
-              </span>
             </div>
           </div>
 

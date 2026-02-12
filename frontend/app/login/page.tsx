@@ -2,16 +2,23 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Lock, User, AlertCircle, Wifi, WifiOff, HelpCircle } from 'lucide-react';
 import { toast } from '@/components/ui/toast';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:6066';
+// Use current hostname for API calls (works with any host/port)
+const getApiUrl = () => {
+  if (typeof window === 'undefined') return 'http://127.0.0.1:6066';
+  // Use the same hostname but with backend port
+  const { protocol, hostname } = window.location;
+  return `${protocol}//${hostname}:6066`;
+};
 
 type ConnectionStatus = 'connected' | 'disconnected' | 'unknown';
 
@@ -23,24 +30,24 @@ function ConnectionStatusIndicator({ status }: { status: ConnectionStatus }) {
     connected: {
       icon: Wifi,
       text: 'Backend Connected',
-      className: 'text-green-600 bg-green-50 border-green-200',
+      className: 'text-green-600',
     },
     disconnected: {
       icon: WifiOff,
       text: 'Backend Disconnected',
-      className: 'text-red-600 bg-red-50 border-red-200',
+      className: 'text-red-600',
     },
     unknown: {
       icon: HelpCircle,
       text: 'Checking connection...',
-      className: 'text-amber-600 bg-amber-50 border-amber-200',
+      className: 'text-amber-600',
     },
   };
 
   const { icon: Icon, text, className } = config[status];
 
   return (
-    <div className={`flex items-center justify-center gap-2 rounded-full px-3 py-1 text-xs font-medium border ${className}`}>
+    <div className={`flex items-center justify-center gap-2 text-xs ${className}`}>
       <Icon className="h-3 w-3" />
       <span>{text}</span>
     </div>
@@ -64,7 +71,7 @@ export default function LoginPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      router.push('/dashboard');
+      router.push('/main');
     }
   }, [isAuthenticated, router]);
 
@@ -74,7 +81,7 @@ export default function LoginPage() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-      const response = await fetch(`${API_URL}/api/health`, {
+      const response = await fetch(`${getApiUrl()}/api/health`, {
         method: 'GET',
         signal: controller.signal,
       });
@@ -120,7 +127,7 @@ export default function LoginPage() {
     const success = await login(username, password);
     if (success) {
       toast.success(`Welcome back, ${username}!`);
-      router.push('/dashboard');
+      router.push('/main');
     }
   };
 
@@ -135,12 +142,19 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#3A2920] via-[#3A2920]/90 to-[#3A2920]/80 p-4">
       {/* Main Card */}
       <Card className="w-full max-w-md shadow-2xl border-0">
-        <CardHeader className="space-y-4 pb-6">
+        <CardHeader className="space-y-4 pb-2">
           {/* Logo and Title */}
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center gap-6">
             {/* NWFTH Logo */}
-            <div className="flex h-16 w-16 items-center justify-center rounded-xl text-xl font-bold shadow-lg bg-[#3A2920] text-[#E0AA2F]">
-              NWFTH
+            <div className="flex items-center justify-center">
+              <Image
+                src="/nwflogo.png"
+                alt="NWFTH Logo"
+                width={200}
+                height={100}
+                className="object-contain"
+                priority
+              />
             </div>
 
             {/* Title */}
@@ -148,13 +162,7 @@ export default function LoginPage() {
               <CardTitle className="text-xl font-bold text-[#3A2920]">
                 Raw Material Partial Picking Remover
               </CardTitle>
-              <CardDescription className="mt-1 text-sm text-gray-600">
-                Northern Wind Food Thailand
-              </CardDescription>
             </div>
-
-            {/* Connection Status */}
-            <ConnectionStatusIndicator status={connectionStatus} />
           </div>
         </CardHeader>
 
@@ -227,12 +235,16 @@ export default function LoginPage() {
                 'Login'
               )}
             </Button>
+
+            {/* Connection Status */}
+            <ConnectionStatusIndicator status={connectionStatus} />
           </form>
 
           {/* Footer */}
-          <p className="mt-6 text-center text-xs text-gray-500">
-            Produced by Wind - ICT NWFTH
-          </p>
+          <div className="mt-6 text-center space-y-1">
+            <p className="text-xs text-gray-500">Version 1.0.0</p>
+            <p className="text-xs text-gray-500">© 2026 Newly Weds Foods Thailand</p>
+          </div>
         </CardContent>
       </Card>
     </div>

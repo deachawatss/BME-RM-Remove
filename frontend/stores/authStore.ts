@@ -69,6 +69,16 @@ interface AuthActions {
 type AuthStore = AuthState & AuthActions;
 
 /**
+ * Get API URL based on current hostname
+ * This ensures it works regardless of how the app is accessed
+ */
+function getApiUrl(): string {
+  if (typeof window === 'undefined') return 'http://127.0.0.1:6066';
+  const { protocol, hostname } = window.location;
+  return `${protocol}//${hostname}:6066`;
+}
+
+/**
  * Real LDAP/SQL authentication via Rust backend API
  */
 async function authenticateWithBackend(
@@ -76,7 +86,7 @@ async function authenticateWithBackend(
   password: string
 ): Promise<{ success: boolean; user?: User; token?: string; error?: string }> {
   try {
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:6066';
+    const API_URL = getApiUrl();
 
     const response = await fetch(`${API_URL}/api/auth/login`, {
       method: 'POST',
